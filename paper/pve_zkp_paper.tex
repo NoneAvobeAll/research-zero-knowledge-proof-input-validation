@@ -1,0 +1,343 @@
+\documentclass[conference]{IEEEtran}
+
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{graphicx}
+\usepackage{url}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\usepackage{cite}
+
+% TARGET VENUE: SECRYPT 2026 (primary), IEEE TrustCom 2026 (secondary)
+% CONTRIBUTION TYPE: System + prototype paper
+% CLAIM SCOPE: Prototype architecture only; no benchmark claims without measurement
+
+\begin{document}
+
+\title{PVE-ZKP: Zero-Knowledge Proof-Backed Input Validation for Browser-Based Forms}
+
+\author{
+  \IEEEauthorblockN{[Author 1 Name]}
+  \IEEEauthorblockA{[Institution] \\[City, Country] \\[email@domain.com]}
+}
+
+\maketitle
+
+\begin{abstract}
+Web applications routinely outsource input validation to third-party services that
+see and store full user submissions, creating avoidable privacy and trust risks.
+This paper presents PVE-ZKP, a prototype architecture in which a browser submits
+form data to an external validation service that runs five zero-knowledge
+policy checks over the inputs, generates a Groth16 proof of policy satisfaction,
+and stores the proof under a short identifier. The browser forwards only this
+proof identifier to the receiving system, which fetches the proof, verifies it
+with \texttt{snarkjs}, and accepts or rejects the submission based solely on
+proof validity, without access to raw form inputs. We implement PVE-ZKP for a
+healthcare-style registration form using Circom 2.1, snarkjs~0.7, and Node.js,
+with policy circuits for format/structure, semantic ranges, set membership,
+hidden-field integrity, and path-boundary checks. Our prototype demonstrates
+that zero-knowledge input validation can be integrated into familiar
+browser--service--backend workflows while preserving data minimization and
+trust separation. We discuss security properties, limitations, and how PVE-ZKP
+relates to adjacent work on ZK circuit analysis and secure aggregation.
+\end{abstract}
+
+\section{Introduction}
+
+Web applications collect sensitive user data---including identifiers, demographic
+attributes, and medical information---through HTML forms. Today, validation of
+these inputs is typically handled by application backends or third-party
+services that receive raw submissions, evaluate policy rules, and return an
+accept/reject decision. This design requires both the validation service and the
+receiving system to see and store full inputs, enlarging the attack surface and
+placing strong trust burdens on intermediaries.
+
+Zero-knowledge proof (ZKP) systems allow a prover to convince a verifier of the
+truth of a statement without revealing the underlying witness~\cite{gmr85}.
+Recent work has applied ZKPs to Web3 rollups, private transactions, and circuit
+security analysis~\cite{chaliasos2024sok,zkap,zkfuzz}, but comparatively little
+attention has been paid to using ZKPs for \emph{input validation} in classical
+web workflows such as browser form submission.
+
+This paper explores the following question: \emph{Can a browser outsource input
+validation to an untrusted service in such a way that the final receiving system
+can verify correct validation without learning raw inputs?} To answer this, we
+prototype a concrete system called PVE-ZKP (Proof-of-Validated-Execution with
+zero-knowledge proofs) and evaluate its suitability as a building block for
+privacy-preserving input pipelines.
+
+The contributions of this paper are:
+\begin{enumerate}[leftmargin=*]
+  \item \textbf{Architecture.} We define a browser--validator--receiver
+    architecture in which a validation service at port~3001 runs five Circom
+    policy circuits over form inputs, generates Groth16 proofs, and stores them
+    under opaque identifiers. The browser sends only a proof identifier onward
+    to the receiving system at port~3002, which fetches and verifies the proof
+    with \texttt{snarkjs} before accepting or rejecting the submission.
+  \item \textbf{Policy circuits.} We design and implement five reusable policy
+    circuits that cover format/structure, semantic range, set membership,
+    hidden-field integrity via commitments, and path-boundary checks, derived
+    from common validation requirements in healthcare-style forms.
+  \item \textbf{Prototype implementation.} We implement PVE-ZKP using Circom
+    2.1, snarkjs~0.7, circomlib~2.0.5, and Node.js~18, providing build scripts
+    for circuit compilation, trusted setup, proof generation, and verification,
+    as well as an end-to-end test harness.
+  \item \textbf{Security discussion and limitations.} We analyze the trust and
+    privacy properties of the architecture, highlight limitations such as
+    single-party trusted setup and lack of performance benchmarking
+    [VERIFY], and discuss how PVE-ZKP complements circuit-analysis tools such as
+    ZKAP and zkFuzz.
+\end{enumerate}
+
+The remainder of this paper is organized as follows. Section~II describes the
+system model and threat assumptions. Section~III presents the PVE-ZKP
+architecture and message flow. Section~IV details the five policy circuits.
+Section~V describes the implementation. Section~VI discusses security properties
+and limitations. Section~VII relates PVE-ZKP to adjacent work, and
+Section~VIII concludes.
+
+\section{System Model and Threat Assumptions}
+
+PVE-ZKP targets web applications in which a user fills out a browser-based form
+and a backend system must decide whether to accept or reject the submission
+according to validation policies. We consider three logical components:
+
+\begin{itemize}[leftmargin=*]
+  \item \textbf{Browser client.} Runs in the user's environment and submits
+    form data over HTTPS to a validation service.
+  \item \textbf{Validation service.} A potentially third-party service
+    (\texttt{validator.js}) listening on port~3001 that receives raw form data,
+    runs ZK policy checks, and stores resultant proofs.
+  \item \textbf{Receiving system.} An application backend
+    (\texttt{receiving\_system.js}) listening on port~3002 that ultimately
+    accepts or rejects submissions after verifying proofs.
+\end{itemize}
+
+We assume standard network adversaries who may eavesdrop or modify traffic
+outside of TLS, and a malicious or curious validation service that attempts to
+learn as much as possible about user inputs. The receiving system follows its
+verification logic but may be operated by a different organization than the
+validator. Our goals are:
+
+\begin{itemize}[leftmargin=*]
+  \item \textbf{G1 (Data minimization).} The receiving system should not need to
+    see raw form inputs in order to decide whether to accept a submission.
+  \item \textbf{G2 (Trust separation).} The system should not have to fully
+    trust the validation service; instead, it should verify ZK proofs.
+  \item \textbf{G3 (Policy expressiveness).} Common input validation patterns
+    should be expressible as Circom circuits without undue complexity.
+  \item \textbf{G4 (Deployability).} The architecture should integrate with
+    existing browser and backend technologies.
+\end{itemize}
+
+\section{PVE-ZKP Architecture}
+
+Figure~\ref{fig:architecture} conceptually illustrates the architecture; we
+summarize the interaction in text here. The core workflow is:
+
+\begin{enumerate}[leftmargin=*]
+  \item \textbf{Browser \textrightarrow{} validation service.} The browser posts
+    JSON-encoded form data to the validation service at port~3001.
+  \item \textbf{ZK policy checks.} The validation service maps form fields to
+    inputs of five Circom circuits representing format, range, membership,
+    integrity, and boundary policies, and runs Groth16 proof generation for each
+    applicable policy.
+  \item \textbf{Proof storage and identifier.} The validation service stores the
+    resulting proofs in an in-memory store keyed by a short, random identifier
+    \texttt{proofId}, and returns this identifier to the browser.
+  \item \textbf{Browser \textrightarrow{} receiving system.} The browser submits
+    an application request that includes only \texttt{proofId} (and any
+    non-sensitive metadata) to the receiving system at port~3002. Raw form
+    values are \emph{not} forwarded.
+  \item \textbf{Proof fetch and verification.} The receiving system calls the
+    validation service's proof API, e.g., \texttt{GET /proof/:id}, to fetch the
+    stored proof(s), and verifies them using the pre-generated verification keys
+    and \texttt{snarkjs}.
+  \item \textbf{Accept / Reject.} If all required proofs verify, the receiving
+    system accepts and processes the submission; otherwise, it rejects and
+    returns an error.
+\end{enumerate}
+
+This workflow is summarized textually as:
+\begin{quote}
+Browser (client) $\rightarrow$ \texttt{validator.js}:3001 (proof generation,
+proof storage under \texttt{proofId}) $\rightarrow$ browser (forward
+\texttt{proofId}) $\rightarrow$ \texttt{receiving\_system.js}:3002 (fetch and
+verify proofs) $\rightarrow$ accept / reject.
+\end{quote}
+
+In the prototype, proof storage is an in-memory map, which is suitable for
+experiments but would need to be replaced with a durable store such as Redis
+with appropriate access control and time-to-live in production.
+
+\section{Policy Circuits}
+
+PVE-ZKP implements five Circom circuits aligned with the ``Policy Circuits''
+section of the open-source prototype:
+
+\begin{itemize}[leftmargin=*]
+  \item \textbf{\texttt{format\_check}} (Format/Structure): ensures that a
+    fixed-length character array (e.g., a 7-character postcode) consists of
+    allowed ASCII characters and obeys simple structure rules.
+  \item \textbf{\texttt{threshold\_check}} (Semantic Range): enforces that a
+    numeric field such as age falls within a minimum or maximum range.
+  \item \textbf{\texttt{membership\_check}} (Approved Set): checks that a
+    value belongs to an approved list, e.g., country codes or insurance types.
+  \item \textbf{\texttt{integrity\_check}} (Hidden Field Integrity): binds a
+    hidden token, a server-side secret, and a session identifier into a Poseidon
+    hash commitment that the receiver can later recompute to ensure the form has
+    not been tampered with.
+  \item \textbf{\texttt{boundary\_check}} (Path Boundary): ensures that a
+    path-like string (e.g., a referral URL prefix) stays within an allowed
+    boundary.
+\end{itemize}
+
+These circuits are written in Circom 2.1 and rely on circomlib 2.0.5. The
+implementation follows the prototype's README, which summarizes private and
+public inputs for each policy.
+
+Due to space constraints, full circuit listings are omitted; the open-source
+repository contains the complete Circom files along with build scripts.
+
+\section{Implementation}
+
+The prototype implementation consists of:
+\begin{itemize}[leftmargin=*]
+  \item Circom 2.1 circuit files for the five policies.
+  \item A \texttt{build\_circuits.sh} script that downloads a powers-of-tau file,
+    compiles circuits, runs Groth16 trusted setup, and exports verification keys.
+  \item A Node.js validation service (\texttt{validator.js}) on port~3001 that
+    exposes HTTP endpoints for proof generation and maintains an in-memory proof
+    store keyed by \texttt{proofId}.
+  \item A Node.js receiving system (\texttt{receiving\_system.js}) on port~3002
+    that fetches proofs by identifier and verifies them using \texttt{snarkjs}.
+  \item A browser-based demo form (HTML + JavaScript) that submits form data to
+    the validator and then forwards \texttt{proofId} to the receiver.
+\end{itemize}
+
+The prototype is packaged with a quick-start workflow: install dependencies,
+build circuits, run end-to-end tests over sample inputs, and start both
+services. This mirrors common Node.js deployment practices, making it easier for
+non-cryptography specialists to experiment with ZK-backed validation.
+
+\section{Security Properties and Limitations}
+
+PVE-ZKP aims to provide data minimization (G1) and trust separation (G2) with
+respect to input validation, assuming the underlying cryptographic primitives
+and Circom tooling are correct.
+
+\subsection{Security Properties}
+
+\textbf{Correctness.} For honest clients and a non-malicious validator, valid
+inputs that satisfy all policy circuits produce proofs that the receiving system
+accepts. This follows from Groth16 completeness and correct circuit
+implementation.
+
+\textbf{Soundness against malicious clients.} A malicious browser that attempts
+to submit invalid inputs must convince the validator to generate proofs for
+unsatisfied policies. Assuming circuits are sound and the Groth16 proof system
+is instantiated correctly, this should be infeasible except with negligible
+probability.
+
+\textbf{Data minimization.} The receiving system bases its decision solely on
+verified proofs and does not receive raw form values from the browser. It may
+still learn some information through the fact that a proof exists (e.g., that
+inputs satisfy policy ranges), which is inherent to the validation outcome.
+
+\textbf{Trust separation.} The receiving system does not have to fully trust the
+validation service: whether or not the validator behaves honestly, the receiver
+can independently verify proofs before accepting submissions.
+
+\subsection{Limitations}
+
+\textbf{Trusted setup.} The prototype uses a single-party Groth16 trusted setup
+script. A production deployment would require a multi-party ceremony to avoid
+trusted setup concerns.
+
+\textbf{Proof storage.} Proofs are stored in an in-memory map in the validation
+service. This is not durable and is unsuitable for high-availability scenarios;
+moreover, access control and retention policies are not enforced.
+
+\textbf{Performance and cost.} We do not yet report empirical measurements for
+proving and verification time, memory usage, or proof sizes; these must be
+measured for realistic deployments [VERIFY].
+
+\textbf{Side-channel leakage.} Timing, error messages, and traffic patterns may
+leak additional information about inputs beyond the ZK proofs themselves. The
+prototype does not implement mitigations such as constant-time paths.
+
+\textbf{Policy coverage.} The five policy circuits cover common validation
+patterns but do not constitute a complete validation language; extending PVE-ZKP
+to richer policies (e.g., cross-field dependencies) is left as future work.
+
+\section{Related Work}
+
+Chaliasos et al.~\cite{chaliasos2024sok} survey security vulnerabilities across
+SNARK-based systems, but do not focus on browser form validation. ZKAP~\cite{zkap}
+performs static analysis of ZK circuits to find underconstrained signals and
+unsafe compositions, while zkFuzz~\cite{zkfuzz} introduces a fuzzing framework
+for ZK circuits. These tools are complementary to PVE-ZKP: they help ensure the
+soundness of the policy circuits used in our architecture.
+
+Adjacent lines of work consider input validation for aggregated statistics and
+federated learning. VPAS and LZKSA-style schemes~\cite{lzksa,risefl} use ZKPs or
+post-quantum secure proofs to ensure that individual client contributions to an
+aggregate model satisfy policy constraints without revealing the contributions
+themselves. In contrast, PVE-ZKP targets single-form submissions in classical
+web applications.
+
+Finally, secure web architectures such as privacy-preserving validation servers
+have explored non-ZK techniques (e.g., differential privacy) to reduce data
+exposure; PVE-ZKP can be viewed as a cryptographic strengthening of these ideas
+by providing explicit proofs of policy satisfaction.
+
+\section{Conclusion}
+
+PVE-ZKP shows that zero-knowledge proofs can be integrated into familiar
+browser-based input workflows to reduce trust in validation services and minimize
+exposure of raw user data to backend systems. By separating the roles of
+validator and receiver and basing acceptance decisions on verifiable ZK policy
+proofs, the architecture offers a concrete path toward privacy-preserving input
+validation in domains such as healthcare forms. Future work includes measuring
+performance overheads, extending the policy circuit library, integrating
+circuit-analysis tools into the development workflow, and exploring
+multi-tenant deployments with stronger setup ceremonies.
+
+\bibliographystyle{IEEEtran}
+
+\begin{thebibliography}{99}
+
+\bibitem{gmr85}
+S.~Goldwasser, S.~Micali, and C.~Rackoff,
+``The knowledge complexity of interactive proof systems,''
+\textit{SIAM Journal on Computing}, vol.~18, no.~1, pp.~186--208, 1989.
+
+\bibitem{chaliasos2024sok}
+S.~Chaliasos \textit{et al.},
+``SoK: What don't we know? Understanding security vulnerabilities in SNARKs,''
+in \textit{Proc. 33rd USENIX Security Symposium}, 2024.
+
+\bibitem{zkap}
+H.~Wen \textit{et al.},
+``Practical security analysis of zero-knowledge proof circuits,''
+in \textit{Proc. 33rd USENIX Security Symposium}, 2024.
+
+\bibitem{zkfuzz}
+J.~Yang \textit{et al.},
+``zkFuzz: Foundation and framework for effective fuzzing of zero-knowledge circuits,''
+arXiv:2504.11961, 2025.
+
+\bibitem{lzksa}
+Z.~Lu \textit{et al.},
+``LZKSA: Lattice-based special zero-knowledge proofs for secure aggregation,''
+in \textit{Proc. ACM CCS}, 2025.
+
+\bibitem{risefl}
+X.~Zhu \textit{et al.},
+``Secure and verifiable data collaboration with low-cost zero-knowledge proofs,''
+arXiv:2311.15310, 2023.
+
+\end{thebibliography}
+
+\end{document}
