@@ -2,9 +2,78 @@
 
 \chapter{Security Analysis}
 
-This chapter provides a deeper analysis of the security properties and
-assumptions of PVE-ZKP. It elaborates on correctness, soundness against
-malicious clients, data minimization, and trust separation, and walks through
-potential attack scenarios and mitigations.
+This chapter analyzes the security properties of PVE-ZKP under the system model
+and threat assumptions introduced earlier. It focuses on correctness, soundness
+against malicious clients, data minimization, and trust separation, and sketches
+how PVE-ZKP can be combined with existing circuit-analysis tools.
 
-% TODO: Add structured analysis tied to the system model and threat assumptions.
+\section{Correctness}
+
+Correctness requires that honest executions with valid inputs lead to
+acceptance by the receiving system. Assuming correct implementation of the
+policy circuits and Groth16, any form submission that satisfies all validation
+policies will yield proofs that verify. The receiving system, which bases its
+decision solely on the verification outcome, will accept such submissions.
+
+Bugs in circuit code or in the mapping from form fields to circuit inputs could
+violate correctness by causing valid submissions to be rejected. These issues
+are engineering defects rather than cryptographic failures, and can be mitigated
+through testing and code review.
+
+\section{Soundness Against Malicious Clients}
+
+Soundness ensures that a malicious client cannot cause the receiving system to
+accept a submission that does not satisfy the specified policies. In PVE-ZKP,
+this property relies on the soundness of the underlying Groth16 proof system
+and the absence of underconstrained signals in the policy circuits.
+
+If a client could find an assignment to circuit inputs that violates the
+intended policy while still satisfying all constraints, or forge a proof without
+knowing a valid witness, it might cause the receiving system to accept invalid
+inputs. Circuit-analysis tools that search for underconstrained signals and
+incomplete constraint sets are therefore valuable complements to the PVE-ZKP
+engineering process.
+
+\section{Data Minimization}
+
+PVE-ZKP is designed to minimize the exposure of raw user data. The receiving
+system never sees the raw form data submitted by the browser; instead, it sees
+only proofs and public signals. This limits the information held by the
+backend and separates policy enforcement from data disclosure.
+
+However, the existence of a proof still reveals that some input satisfying the
+policy exists, and timing, error messages, or access patterns could leak
+additional information. PVE-ZKP does not attempt to provide formal differential
+privacy guarantees, and developers must consider application-specific leakage
+channels.
+
+\section{Trust Separation}
+
+The architecture separates the roles of validator and receiver. The validator
+may be operated by a third party and is not assumed to be fully trusted. Even
+if the validator misbehaves or is compromised, the receiving system will only
+accept submissions for which it can verify valid proofs.
+
+Trust separation is not absolute: the validator still sees raw inputs and could
+log or misuse them. PVE-ZKP reduces---but does not eliminate---the need to
+trust the validator, and additional organizational and technical controls are
+needed to govern validator behavior in practice.
+
+\section{Integration with Circuit-Analysis Tools}
+
+As noted in the background chapter, recent research has produced tools for
+analyzing ZK circuits for security issues. Integrating such tools into the
+PVE-ZKP development cycle helps ensure that the policy circuits accurately
+encode the intended validation logic and that no unintended degrees of freedom
+exist.
+
+A mature deployment of PVE-ZKP would include automated checks that run these
+analysis tools on each circuit whenever it is modified, as part of a continuous
+integration pipeline.
+
+\section{Residual Risks}
+
+Residual risks include side-channel leakage, misconfiguration of environment
+variables and secrets, and subtle bugs in glue code that maps form inputs to
+circuit signals. The current prototype does not address these issues fully; they
+are discussed further in the next chapter on limitations and future work.

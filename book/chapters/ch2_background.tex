@@ -2,9 +2,71 @@
 
 \chapter{Background}
 
-This chapter reviews the necessary background on zero-knowledge proofs, Groth16
-and Circom tooling, web input validation patterns, and existing work on ZK
-circuit analysis and secure aggregation. The goal is to equip the reader with
-sufficient context to understand the PVE-ZKP architecture and design choices.
+This chapter reviews the background material required to understand the PVE-ZKP
+system. The focus is on three topics: zero-knowledge proof systems and the
+Groth16 construction, tooling for building and verifying circuits in practice,
+and conventional web input validation patterns and their limitations.
 
-% TODO: Add subsections for ZKPs, Groth16, Circom/snarkjs, and related work.
+\section{Zero-Knowledge Proofs and Groth16}
+
+Zero-knowledge proofs allow one party (the prover) to convince another party
+(the verifier) that a statement is true without revealing the underlying
+witness. Modern zk-SNARK constructions, such as Groth16, provide succinct,
+non-interactive proofs and fast verification, which makes them attractive for
+use in deployed systems.
+
+The Groth16 protocol represents a computation as a rank-1 constraint system
+(R1CS) and, after a trusted setup phase, allows the prover to generate a proof
+that they know a witness satisfying all constraints. Verification uses a small
+set of group operations and pairing checks, with complexity independent of the
+witness size. In PVE-ZKP, we rely on existing implementations of Groth16 in the
+snarkjs library rather than re-deriving the protocol.
+
+\section{Circom, snarkjs, and circomlib}
+
+Circom is a domain-specific language for writing arithmetic circuits that can
+be compiled to R1CS and used with proving systems such as Groth16. Circom
+circuits define signals and constraints in a modular way, making it easier to
+encode typical validation patterns such as range checks, set membership, and
+string-format constraints.
+
+The snarkjs toolchain provides command-line and JavaScript APIs for compiling
+Circom circuits, running trusted setup ceremonies, generating proofs, and
+verifying proofs. The circomlib and circomlibjs libraries supply reusable
+components such as hash functions (e.g., Poseidon) and field-friendly
+primitives. PVE-ZKP uses Circom 2.1 and snarkjs in its build scripts and
+runtime services.
+
+\section{Conventional Web Input Validation}
+
+In conventional web architectures, input validation is performed in two places:
+client-side checks in the browser (for responsiveness and user experience) and
+server-side checks in the receiving application backend. Client-side checks are
+easily bypassed by an adversary who can craft arbitrary HTTP requests, so
+security ultimately relies on the server-side logic.
+
+Third-party validation services have emerged to provide centralized policy
+engines for common checks such as email verification, address normalization, and
+fraud detection. These services typically require the application backend to
+send raw user data to the validator and then accept or reject submissions based
+on the returned decision. While convenient, this approach increases the number
+of parties that see sensitive data and creates additional trust assumptions.
+
+\section{Related Work on ZK Circuit Analysis and Secure Aggregation}
+
+The PVE-ZKP system is complementary to two lines of work. First, security
+analysis tools for ZK circuits, such as those that search for underconstrained
+signals or unsafe compositions, help developers detect mistakes that could
+invalidate soundness guarantees. These tools operate at the circuit-design
+level and can be integrated into the PVE-ZKP development workflow but do not
+address web input validation architecture directly.
+
+Second, schemes for secure aggregation and privacy-preserving federated
+learning use ZKPs or related primitives to ensure that individual client
+contributions satisfy policy constraints without revealing the contributions
+themselves. PVE-ZKP instead targets single-form submissions in classical web
+applications, but shares the goal of separating validation from disclosure.
+
+This background motivates the design of PVE-ZKP as an application of existing
+ZK tools and ideas to a different part of the web security landscape: input
+validation for browser-based forms.

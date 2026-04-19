@@ -2,10 +2,99 @@
 
 \chapter{PVE-ZKP Architecture}
 
-This chapter presents the browser--validator--receiver architecture implemented
-in the PVE-ZKP prototype. It describes the message flows between the browser
-client, the validation service on port 3001, and the receiving system on port
-3002, and explains how proof identifiers (proofId) decouple validation from the
-final acceptance decision.
+This chapter describes the architecture of PVE-ZKP in terms of components,
+interfaces, and message flows. It mirrors the concise architecture presented in
+the conference paper, but provides additional detail and discussion of design
+choices and deployment variants.
 
-% TODO: Add sequence diagrams and further discussion of deployment variants.
+\section{High-Level Overview}
+
+At a high level, PVE-ZKP interposes a validation service between the browser
+client and the receiving system. The validation service runs zero-knowledge
+policy checks on raw form data and returns only an opaque proof identifier to
+the browser. The receiving system uses this identifier to fetch and verify
+proofs before deciding whether to accept the submission.
+
+The architecture can be summarized textually as:
+
+\begin{quote}
+Browser (client) $\rightarrow$ \texttt{validator.js}:3001 (proof generation,
+proof storage under \texttt{proofId}) $\rightarrow$ browser (forward
+\texttt{proofId}) $\rightarrow$ \texttt{receiving\_system.js}:3002 (fetch and
+verify proofs) $\rightarrow$ accept / reject.
+\end{quote}
+
+In the prototype implementation, both the validation service and the receiving
+system are implemented as Node.js applications, but the architectural pattern
+is independent of the specific technology stack.
+
+\section{Component Responsibilities}
+
+\subsection{Browser Client}
+
+The browser client is responsible for collecting form inputs from the user and
+communicating with both services:
+
+\begin{itemize}[leftmargin=*]
+  \item \textbf{To validator:} send form data as JSON to the validation service
+    at \texttt{/validate} on port 3001 and handle the returned
+    \texttt{proofId}.
+  \item \textbf{To receiver:} send a follow-up request containing only
+    \texttt{proofId} to the receiving system at \texttt{/receive} on port 3002.
+\end{itemize}
+
+The client performs basic sanity checks for user experience, but security does
+not rely on client-side validation.
+
+\subsection{Validation Service}
+
+The validation service, implemented in \texttt{validator.js}, exposes an HTTP
+API for proving and for proof retrieval. It:
+
+\begin{itemize}[leftmargin=*]
+  \item accepts raw form data from the browser;
+  \item maps fields to inputs of the five Circom policy circuits;
+  \item generates Groth16 proofs using snarkjs;
+  \item stores proofs in an in-memory map keyed by a randomly generated
+        \texttt{proofId}; and
+  \item returns \texttt{proofId} to the browser as evidence that validation
+        succeeded.
+\end{itemize}
+
+A separate endpoint allows the receiving system to fetch proofs by identifier.
+The service never exposes raw inputs via this endpoint, only proofs and public
+signals.
+
+\subsection{Receiving System}
+
+The receiving system, implemented in \texttt{receiving\_system.js}, is the
+ultimate arbiter of whether a submission is accepted. It:
+
+\begin{itemize}[leftmargin=*]
+  \item accepts a JSON request from the browser containing \texttt{proofId};
+  \item fetches corresponding proofs from the validation service via an HTTP
+        call to \texttt{/proof/:id};
+  \item loads verification keys for each circuit; and
+  \item verifies each proof using snarkjs before returning an accept/reject
+        decision.
+\end{itemize}
+
+By design, the receiving system does not need the raw form data and can make
+its decision based solely on the set of verified proofs.
+
+\section{Deployment Considerations}
+
+Although the prototype runs both services on localhost, PVE-ZKP is intended to
+support more general deployment patterns. For example, the validation service
+could be a third-party microservice operated by a separate organization, while
+receiving systems belong to multiple tenants. In such settings, the
+architecture's clear separation of roles and data flows becomes particularly
+important, and additional concerns such as authentication, authorization, and
+rate limiting must be considered.
+
+The current prototype uses an in-memory proof store and a simple HTTP
+interface. A production deployment would likely replace the in-memory store
+with a durable database or cache (e.g., Redis with appropriate access control
+and expiration policies) and add mutual authentication between services. These
+engineering extensions do not change the core architecture but strengthen its
+operational security.

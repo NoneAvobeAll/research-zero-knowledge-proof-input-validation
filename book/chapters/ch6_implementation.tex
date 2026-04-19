@@ -2,9 +2,107 @@
 
 \chapter{Implementation}
 
-This chapter maps the PVE-ZKP architecture onto the open-source prototype. It
-covers the browser-based demo, the validation service (validator.js) on port
-3001, the receiving system (receiving_system.js) on port 3002, and the build
-scripts and trusted-setup workflow for the Circom circuits.
+This chapter explains how the PVE-ZKP architecture and policy circuits are
+implemented in the open-source prototype. It describes the directory structure,
+key scripts and services, and the end-to-end workflow for building circuits,
+generating proofs, and verifying them.
 
-% TODO: Describe directory structure, key configuration parameters, and testing workflow.
+\section{Project Structure}
+
+The prototype repository is organized as follows:
+
+\begin{verbatim}
+pve-zkp/
+├── circuits/           Circom constraint files (5 circuits)
+├── prover/
+│   ├── generate_proof.js   CLI proof generator
+│   ├── validator.js        Express validation service (:3001)
+│   └── inputs/             Sample JSON inputs for each circuit
+├── verifier/
+│   ├── verify_proof.js         CLI proof verifier
+│   └── receiving_system.js     Express receiving system (:3002)
+├── webapp/
+│   ├── index.html          Healthcare registration form
+│   └── submit.js           Client-side ZKP submission handler
+├── keys/               Generated keys (after build)
+├── outputs/            Generated proofs (after prove)
+├── scripts/
+│   ├── build_circuits.sh   Full build pipeline
+│   └── test_e2e.sh         End-to-end test runner
+└── package.json
+\end{verbatim}
+
+This layout mirrors the logical separation between circuits, proving logic,
+verification logic, and the web front end.
+
+\section{Circuit Build and Trusted Setup}
+
+The \texttt{scripts/build\_circuits.sh} script orchestrates compilation and
+trusted setup for all policy circuits. It downloads a powers-of-tau file,
+compiles the Circom source files into R1CS and WebAssembly artifacts, runs the
+Groth16 setup phase for each circuit, and exports verification keys into the
+\texttt{keys/} directory.
+
+The trusted setup in the prototype is single-party and suitable only for
+experimentation. A production deployment would require a multi-party ceremony
+to avoid reliance on a single setup participant.
+
+\section{Validation Service Implementation}
+
+The validation service, implemented in \texttt{prover/validator.js}, is an
+Express application that exposes two main endpoints:
+
+\begin{itemize}[leftmargin=*]
+  \item \texttt{POST /validate}: accepts JSON-encoded form data, runs all five
+    policy circuits using snarkjs to generate Groth16 proofs, and stores the
+    resulting proofs in an in-memory map keyed by a random \texttt{proofId}.
+  \item \texttt{GET /proof/:id}: returns the stored proofs and public signals
+    for the given identifier, without exposing raw inputs.
+\end{itemize}
+
+Helper functions handle string-to-ASCII conversion, age computation from a date
+of birth, and construction of circuit inputs. Environment variables configure
+values such as server-side secrets.
+
+\section{Receiving System Implementation}
+
+The receiving system, implemented in \texttt{verifier/receiving\_system.js}, is
+another Express application. It exposes a single main endpoint:
+
+\begin{itemize}[leftmargin=*]
+  \item \texttt{POST /receive}: accepts a JSON body containing \texttt{proofId},
+    fetches proofs from the validation service, loads verification keys for each
+    circuit from \texttt{keys/}, and verifies all proofs using snarkjs. It
+    returns an accept/reject decision and a reason on failure.
+\end{itemize}
+
+The receiving system never processes raw form inputs. Its logic is entirely
+expressed in terms of proof verification.
+
+\section{Browser Application}
+
+The browser-facing part of the prototype resides in the \texttt{webapp/}
+folder. The main HTML page contains a healthcare-style registration form, and
+\texttt{submit.js} attaches a handler that:
+
+\begin{enumerate}[leftmargin=*]
+  \item collects form values and sends them to the validation service at
+        \texttt{/validate};
+  \item receives a \texttt{proofId} on success; and
+  \item sends a follow-up request containing only \texttt{proofId} to the
+        receiving system at \texttt{/receive}.
+\end{enumerate}
+
+Client-side checks provide immediate feedback but are treated as a usability
+feature, not a security boundary.
+
+\section{End-to-End Workflow}
+
+To run the prototype end to end, a developer installs dependencies, builds the
+circuits, starts the validation and receiving services, and opens the browser
+form. A helper script runs end-to-end tests that exercise all five policy
+circuits against sample inputs.
+
+This implementation chapter ties the abstract architecture to concrete code and
+scripts, which in turn support the security analysis and limitations discussed
+in subsequent chapters.

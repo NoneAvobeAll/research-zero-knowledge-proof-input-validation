@@ -2,9 +2,50 @@
 
 \chapter{Introduction and Motivation}
 
-This chapter motivates the need for zero-knowledge-proof-backed input validation
-in web applications, with a focus on sensitive domains such as healthcare forms.
-It introduces the high-level problem, outlines shortcomings of conventional
-validation pipelines, and presents the research question driving PVE-ZKP.
+Web applications routinely handle highly sensitive data through browser-based
+forms, including identifiers, demographic attributes, financial records, and
+medical information. In contemporary deployments, input validation is typically
+performed by application backends or third-party services that receive raw
+submissions, evaluate policy rules, and then accept or reject requests. This
+centralization of validation logic implies that multiple parties see and often
+store full user inputs, enlarging the attack surface and increasing the
+consequences of compromise or misuse.
 
-% TODO: Expand with narrative, real-world examples, and overview of contributions.
+Zero-knowledge proof (ZKP) systems provide a way for a prover to convince a
+verifier that an input satisfies a policy without revealing the input itself.
+Recent advances have made succinct non-interactive arguments of knowledge
+(SNARKs) practical for real-world systems, and toolchains such as Circom and
+snarkjs allow developers to write and deploy constraint systems with relatively
+low friction. Despite this progress, the use of ZKPs for classical web input
+validation---rather than Web3 rollups or cryptocurrency protocols---remains
+under-explored.
+
+This monograph is driven by the following research question: \emph{Can a browser
+outsource input validation to an untrusted service in such a way that the final
+receiving system can verify correct validation without learning raw inputs?}
+Addressing this question requires combining ideas from web security, applied
+cryptography, and systems design.
+
+To make this question concrete, we design and analyze PVE-ZKP (Proof-of-
+Validated-Execution with zero-knowledge proofs), a system that introduces a
+separate validation service into the form-submission path. The browser submits
+form data to this validation service, which runs a set of zero-knowledge policy
+checks, generates proofs, and returns only an opaque proof identifier to the
+browser. The browser then forwards this identifier to the receiving system,
+which fetches and verifies the corresponding proofs before deciding whether to
+accept the submission. In this design, the receiving system bases its decision
+solely on verified proofs and need not see raw form values.
+
+PVE-ZKP is instantiated as a prototype for a healthcare-style registration form
+using Circom for circuit definitions and Node.js for both the validation
+service and the receiving system. The prototype is intentionally modest in
+scope: it implements five reusable policy circuits, a single trusted-setup
+workflow, and a browser-based demo application. The goal of this monograph is
+not to present a finished product, but to document a research system that can
+serve as a foundation for later conference papers and a full thesis.
+
+The remainder of this document expands on and generalizes the shorter
+conference-style paper. It provides additional background, formalizes the
+problem and system model, explains the PVE-ZKP architecture in detail, walks
+through circuit and implementation design choices, and offers a more extensive
+security analysis and discussion of limitations and future work.

@@ -2,9 +2,73 @@
 
 \chapter{Limitations and Future Work}
 
-This chapter expands on the limitations of the current PVE-ZKP prototype,
-including trusted setup, proof storage, performance, side-channel leakage, and
-policy coverage, and outlines directions for future research and engineering
-work.
+This chapter expands on the limitations of the current PVE-ZKP prototype and
+outlines directions for future research and engineering work. The goal is to
+clarify what the present system does \emph{not} provide and to sketch a roadmap
+for strengthening and extending it.
 
-% TODO: Turn limitation bullets into subsections with more detailed discussion.
+\section{Trusted Setup}
+
+The prototype relies on a single-party trusted setup for each Groth16 circuit.
+This is acceptable for experimentation but undesirable in production, as a
+setup participant who retains trapdoor information could, in principle,
+construct fraudulent proofs.
+
+Future work should replace the single-party setup with a multi-party
+computation (MPC) ceremony, ideally using existing tooling and best practices
+from other SNARK deployments. The monograph does not prescribe a specific
+ceremony design but treats this as a modular component.
+
+\section{Proof Storage and Durability}
+
+Proofs are currently stored in an in-memory map inside the validation service.
+This design is simple but has several drawbacks: proofs are lost on service
+restart, no explicit retention policy is enforced, and there is no access
+control beyond the service's own process boundary.
+
+A more robust design would use a dedicated data store such as a database or
+cache with strict access control, audit logging, and time-to-live policies.
+This would also support horizontal scaling and fault tolerance for the
+validation service.
+
+\section{Performance and Scalability}
+
+The prototype does not include empirical benchmarks for proof-generation time,
+verification time, or resource consumption. These measurements are essential
+for understanding how PVE-ZKP behaves under realistic loads and for identifying
+bottlenecks.
+
+Future work should design and run experiments that measure performance for
+various circuit sizes, concurrency levels, and deployment settings. Results
+would inform circuit design, parameter choices, and the feasibility of
+large-scale deployments.
+
+\section{Side-Channel Leakage}
+
+Timing differences, error messages, and network-level patterns may reveal
+information about inputs beyond what is captured in the zero-knowledge proofs
+themselves. The prototype does not attempt to equalize computation time or
+randomize responses to mitigate such side channels.
+
+Investigating the impact of side-channel leakage in this architecture, and
+exploring mitigations such as constant-time implementations or rate limiting,
+is an important direction for future work.
+
+\section{Policy Coverage and Expressiveness}
+
+The five policy circuits implemented in PVE-ZKP cover only a subset of
+validation patterns that arise in real applications. They do not, for example,
+handle complex cross-field dependencies, multi-step workflows, or adaptive
+policies based on external data.
+
+Extending the policy library to support richer constraints, while keeping
+circuits auditable and efficient, is an open design challenge. Additional work
+is needed to develop higher-level abstractions for composing policy circuits
+and for verifying that combined policies behave as intended.
+
+\section{Toward a Full System and Thesis}
+
+Finally, this monograph represents an intermediate step between a prototype and
+a full thesis. Future work includes not only the technical enhancements
+outlined above but also more formal modeling, security proofs where appropriate,
+and comprehensive evaluation across multiple application domains.

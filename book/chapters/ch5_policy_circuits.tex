@@ -2,9 +2,77 @@
 
 \chapter{Policy Circuit Design}
 
-This chapter details the five Circom policy circuits used in PVE-ZKP:
-format/structure, semantic range, set membership, hidden-field integrity, and
-path-boundary checks. For each circuit, it describes the security goal, private
-and public inputs, and key constraints.
+This chapter describes the five Circom policy circuits used in PVE-ZKP. Each
+circuit encodes a distinct class of validation policy relevant to web forms.
+Together, they provide a small but expressive library for the healthcare-style
+registration form implemented in the prototype.
 
-% TODO: For each circuit, add subsections with circuit sketches and design trade-offs.
+\section{Design Principles}
+
+The policy circuits in PVE-ZKP are designed with the following principles in
+mind:
+
+\begin{itemize}[leftmargin=*]
+  \item \textbf{Simplicity:} circuits should be small and easy to audit.
+  \item \textbf{Composability:} circuits should be reusable across forms and
+    domains with minor parameter changes.
+  \item \textbf{Alignment with common policies:} the circuits target validation
+    patterns frequently encountered in real-world applications.
+\end{itemize}
+
+\section{Format and Structure: \texttt{format\_check}}
+
+The \texttt{format\_check} circuit enforces simple structural constraints on a
+fixed-length character array. In the prototype, it is used to check a derived
+representation of the user's name or a postcode, ensuring that each character
+belongs to an allowed set and that the overall pattern matches basic rules.
+
+Inputs include an array of ASCII codes, and constraints ensure that they fall
+within allowed ranges. In more advanced versions, this circuit could encode
+regular-expression-style structure.
+
+\section{Semantic Range: \texttt{threshold\_check}}
+
+The \texttt{threshold\_check} circuit enforces a numeric range constraint. For
+example, it can require that a derived age value is at least a specified
+minimum. Inputs include the numeric value and one or more threshold parameters,
+and constraints ensure that comparisons hold in the finite field.
+
+In PVE-ZKP, age is computed off-circuit from a date of birth, and the circuit
+verifies that the age meets a minimum requirement (e.g., 18 years).
+
+\section{Set Membership: \texttt{membership\_check}}
+
+The \texttt{membership\_check} circuit tests whether a value appears in an
+approved set of options, such as enumerated roles or country codes. A simple
+implementation enumerates the allowed values and enforces that the input equals
+one of them. More sophisticated designs could use Merkle trees or accumulators
+for larger sets, but the prototype focuses on small enumerations.
+
+\section{Hidden-Field Integrity: \texttt{integrity\_check}}
+
+The \texttt{integrity\_check} circuit binds a hidden token to server-side state
+such as a secret and a session identifier. The goal is to ensure that a hidden
+form field has not been tampered with and that it corresponds to a commitment
+previously issued by the server.
+
+In a full design, the circuit would recompute a Poseidon hash (or similar)
+over the secret, session identifier, and token, and enforce equality with a
+public commitment input. In the current prototype, the commitment handling is
+simplified and marked as a limitation to be addressed in future work.
+
+\section{Path Boundary: \texttt{boundary\_check}}
+
+The \texttt{boundary\_check} circuit enforces that a path-like string, such as
+an upload directory prefix, stays within an allowed boundary. Inputs include a
+fixed-length array representing the path and another array for the expected
+prefix, and constraints ensure that the prefix matches character by character.
+
+This circuit models a common requirement in file-handling code: ensuring that
+user-controlled paths do not escape a designated directory tree. Encoding such
+checks in a circuit lets the receiving system verify that this policy was
+correctly applied by the validation service.
+
+Overall, these five circuits illustrate how common validation patterns can be
+translated into Circom constraints. Later work can extend this library to cover
+additional policies and more complex cross-field dependencies.

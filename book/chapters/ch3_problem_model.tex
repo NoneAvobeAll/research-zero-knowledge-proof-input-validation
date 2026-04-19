@@ -2,9 +2,103 @@
 
 \chapter{Problem Statement and System Model}
 
-This chapter formalizes the input-validation problem addressed by PVE-ZKP,
-including entities, data flows, trust assumptions, and goals such as data
-minimization and trust separation. It refines and expands the system model and
-threat assumptions that appear in the conference paper.
+This chapter formalizes the input-validation problem addressed by PVE-ZKP. It
+introduces the participating entities, the data to be protected, the goals and
+non-goals of the system, and the threat assumptions under which the design is
+intended to operate.
 
-% TODO: Define goals G1--G4 precisely and specify attacker capabilities.
+\section{Problem Statement}
+
+Consider a web application that accepts submissions from users via
+browser-based forms. The application must decide whether to accept or reject
+each submission according to a set of validation policies, such as:
+
+\begin{itemize}[leftmargin=*]
+  \item format and structural constraints on strings (e.g., postcodes);
+  \item range constraints on numeric values (e.g., age thresholds);
+  \item membership in an approved set (e.g., roles or countries);
+  \item integrity of hidden fields bound to server-side state; and
+  \item restrictions on path-like strings used for file uploads or URLs.
+\end{itemize}
+
+In conventional architectures, the application backend evaluates these policies
+using the raw form data. If an external validation service is used, the backend
+sends the raw data to the validator, which returns a decision. In both cases,
+multiple parties see sensitive inputs.
+
+The core problem we study is how to enable the application backend (the
+receiving system) to validate submissions according to specified policies
+\emph{without} needing to see the raw inputs, and without having to fully trust
+a separate validation service.
+
+\section{Entities and Data Flows}
+
+PVE-ZKP models three logical components:
+
+\begin{itemize}[leftmargin=*]
+  \item \textbf{Browser client:} runs in the user's environment and displays
+the form. It collects form fields, sends them to the validation service, and
+later forwards a proof identifier to the receiving system.
+  \item \textbf{Validation service:} an external or third-party service that
+receives raw form data, runs zero-knowledge policy checks, generates proofs,
+and stores them under an opaque identifier.
+  \item \textbf{Receiving system:} the application backend that ultimately
+accepts or rejects submissions based on verified proofs obtained from the
+validation service.
+\end{itemize}
+
+The high-level data flow is:
+
+\begin{enumerate}[leftmargin=*]
+  \item The browser sends form data to the validation service.
+  \item The validation service runs policy circuits and stores resulting proofs
+        under a short identifier, \texttt{proofId}.
+  \item The browser sends only \texttt{proofId} (and optional non-sensitive
+        metadata) to the receiving system.
+  \item The receiving system fetches proofs using \texttt{proofId}, verifies
+        them, and then accepts or rejects the submission.
+\end{enumerate}
+
+\section{Goals and Non-Goals}
+
+The design goals of PVE-ZKP can be summarized as:
+
+\begin{itemize}[leftmargin=*]
+  \item \textbf{G1 (Data minimization):} the receiving system should not require
+    access to raw form inputs in order to enforce validation policies.
+  \item \textbf{G2 (Trust separation):} the receiving system should not have to
+    fully trust the validation service; instead, it should rely on verifiable
+    zero-knowledge proofs.
+  \item \textbf{G3 (Policy expressiveness):} common input validation patterns
+    should be expressible as Circom circuits without excessive complexity.
+  \item \textbf{G4 (Deployability):} the architecture should integrate with
+    existing web technologies and development practices.
+\end{itemize}
+
+Non-goals include providing formal end-to-end privacy guarantees in the
+presence of arbitrary application-layer logic, replacing all forms of server-
+side validation, or optimizing proof generation for very large-scale,
+latency-sensitive deployments. These topics are discussed further as future
+work.
+
+\section{Threat Assumptions}
+
+PVE-ZKP assumes standard network adversaries who may eavesdrop on or attempt to
+modify traffic outside of transport-layer security, as well as application-
+layer adversaries who may control the browser client or try to exploit the
+validation service. The receiving system is assumed to follow its verification
+logic but may be operated by a different organization than the validator.
+
+The adversary may:
+
+\begin{itemize}[leftmargin=*]
+  \item tamper with client-side scripts or send arbitrary HTTP requests;
+  \item attempt to trick the validator into generating proofs for invalid
+        inputs;
+  \item attempt to replay previously issued proofs; or
+  \item attempt to correlate proof identifiers and timing information to infer
+        information about inputs.
+\end{itemize}
+
+Subsequent chapters analyze how PVE-ZKP's architecture and policy circuits
+address these threats, and where additional mechanisms are needed.
