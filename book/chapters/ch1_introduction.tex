@@ -20,7 +20,7 @@ low friction. Despite this progress, the use of ZKPs for classical web input
 validation---rather than Web3 rollups or cryptocurrency protocols---remains
 under-explored.
 
-This monograph is driven by the following research question: \emph{Can a browser
+This thesis is driven by the following research question: \emph{Can a browser
 outsource input validation to an untrusted service in such a way that the final
 receiving system can verify correct validation without learning raw inputs?}
 Addressing this question requires combining ideas from web security, applied
@@ -38,14 +38,17 @@ solely on verified proofs and need not see raw form values.
 
 PVE-ZKP is instantiated as a prototype for a healthcare-style registration form
 using Circom for circuit definitions and Node.js for both the validation
-service and the receiving system. The prototype is intentionally modest in
-scope: it implements five reusable policy circuits, a single trusted-setup
-workflow, and a browser-based demo application. The goal of this monograph is
-not to present a finished product, but to document a research system that can
-serve as a foundation for later conference papers and a full thesis.
+service and the receiving system. The system implements five reusable policy
+circuits, a trusted-setup workflow, and a browser-based demo application. The
+thesis presents PVE-ZKP as a complete research system: it motivates and
+formalizes the problem, develops and implements the architecture, and analyzes
+its security properties and limitations.
 
-The remainder of this document expands on and generalizes the shorter
-conference-style paper. It provides additional background, formalizes the
-problem and system model, explains the PVE-ZKP architecture in detail, walks
-through circuit and implementation design choices, and offers a more extensive
-security analysis and discussion of limitations and future work.
+The remainder of this document is organized as follows. Chapter~2 provides
+background on zero-knowledge proofs, tooling, and conventional input
+validation. Chapter~3 formalizes the problem and system model. Chapter~4
+presents the PVE-ZKP architecture. Chapter~5 details the policy circuit design
+and Chapter~6 describes the implementation. Chapter~7 offers a security
+analysis, while Chapter~8 discusses limitations and future work. Chapter~9
+concludes, and Chapter~10 outlines an evaluation methodology and planned
+experiments for empirical assessment.

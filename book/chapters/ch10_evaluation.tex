@@ -1,0 +1,72 @@
+% Chapter 10: Evaluation Methodology
+
+\chapter{Evaluation Methodology}
+
+This chapter outlines an evaluation plan for PVE-ZKP. It defines the goals and
+metrics of interest, describes an experimental setup for measuring performance
+and resource usage, and sketches a set of experiments that can be carried out
+once the implementation is deployed in a suitable environment.
+
+\section{Evaluation Goals}
+
+The primary goals of the evaluation are:
+
+\begin{itemize}[leftmargin=*]
+  \item to quantify the cost of proving and verification for the five policy
+    circuits used in PVE-ZKP;
+  \item to measure end-to-end latency for form submissions under realistic
+    workloads;
+  \item to assess how performance scales with increasing numbers of concurrent
+    clients; and
+  \item to compare PVE-ZKP against a baseline architecture that performs
+    validation entirely on the receiving system without zero-knowledge proofs.
+\end{itemize}
+
+\section{Metrics}
+
+Relevant metrics include:
+
+\begin{itemize}[leftmargin=*]
+  \item proving time per circuit and per submission;
+  \item verification time per circuit and per submission;
+  \item memory usage and CPU utilization on the validation service and
+    receiving system;
+  \item end-to-end response time as perceived by the client; and
+  \item throughput (submissions per second) under varying loads.
+\end{itemize}
+
+These metrics can be collected using standard profiling and benchmarking tools
+available in Node.js and the underlying operating system.
+
+\section{Experimental Setup}
+
+A typical experimental setup would fix:
+
+\begin{itemize}[leftmargin=*]
+  \item hardware characteristics (CPU, memory, storage);
+  \item network conditions (local vs remote deployment, latency, bandwidth);
+  \item versions of Circom, snarkjs, and other dependencies; and
+  \item representative input distributions for the healthcare-style form.
+\end{itemize}
+
+Experiments should be automated via scripts that deploy the validation and
+receiving services, generate synthetic but realistic workloads, and record
+results for later analysis.
+
+\section{Planned Experiments}
+
+Planned experiments include:
+
+\begin{itemize}[leftmargin=*]
+  \item microbenchmarks that measure prove and verify times for each individual
+    policy circuit across a range of input sizes and parameters;
+  \item end-to-end benchmarks that measure client-perceived latency and
+    throughput as the number of concurrent form submissions increases; and
+  \item comparative benchmarks that implement equivalent policies directly on
+    the receiving system without ZKPs to quantify overheads introduced by
+    PVE-ZKP.
+\end{itemize}
+
+Results from these experiments would be incorporated into the thesis as tables
+and figures once available, providing a quantitative complement to the
+qualitative security analysis presented earlier.

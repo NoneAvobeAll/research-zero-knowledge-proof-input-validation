@@ -2,12 +2,12 @@
 
 \chapter{Conclusion}
 
-This monograph has presented PVE-ZKP, a system that applies zero-knowledge
-proofs to the problem of input validation for browser-based forms. By
-introducing a dedicated validation service that runs policy circuits over raw
-inputs and returns only proof identifiers to the browser, PVE-ZKP enables the
-receiving system to base its acceptance decisions on verifiable proofs rather
-than on a position of blind trust.
+This thesis has presented PVE-ZKP, a system that applies zero-knowledge proofs
+to the problem of input validation for browser-based forms. By introducing a
+dedicated validation service that runs policy circuits over raw inputs and
+returns only proof identifiers to the browser, PVE-ZKP enables the receiving
+system to base its acceptance decisions on verifiable proofs rather than on a
+position of blind trust.
 
 The work is motivated by the need to reduce unnecessary exposure of sensitive
 user data and to separate the concerns of policy enforcement and data storage.
@@ -15,15 +15,16 @@ Using Circom and snarkjs, PVE-ZKP implements a concrete architecture with five
 policy circuits and demonstrates that such an approach can be integrated into
 familiar web workflows without major changes to the browser or backend stacks.
 
-Beyond describing the prototype, the monograph has provided background on
+Beyond describing the implementation, the thesis has provided background on
 zero-knowledge proofs, formalized the system model and threat assumptions,
 explained the architecture and circuit design, and analyzed security
-properties, limitations, and future directions. The prototype has clear
+properties, limitations, and future directions. The current system has clear
 limitations, but it serves as a basis for further exploration of privacy-
 preserving input validation and for more formal research contributions.
 
 In the near term, PVE-ZKP can be extended with stronger trusted-setup
 mechanisms, more robust proof storage, richer policy circuits, and empirical
-evaluations. In the longer term, the ideas developed here can inform conference
-papers and a full thesis that explore the broader design space of verifiable and
-privacy-preserving validation services in web and distributed systems.
+evaluations following the methodology outlined in the evaluation chapter. In
+the longer term, the ideas developed here can inform conference papers and
+future theses that explore the broader design space of verifiable and privacy-
+preserving validation services in web and distributed systems.
