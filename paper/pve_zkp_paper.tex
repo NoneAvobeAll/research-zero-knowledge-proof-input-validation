@@ -60,16 +60,16 @@ security analysis~\cite{chaliasos2024sok,zkap,zkfuzz}, but comparatively little
 attention has been paid to using ZKPs for \emph{input validation} in classical
 web workflows such as browser form submission.
 
-This paper explores the following question: \emph{Can a browser outsource input
-validation to an untrusted service in such a way that the final receiving system
-can verify correct validation without learning raw inputs?} To answer this, we
-prototype a concrete system called PVE-ZKP (Proof-of-Validated-Execution with
-zero-knowledge proofs) and evaluate its suitability as a building block for
-privacy-preserving input pipelines.
+This paper is driven by the following research question: \emph{Can a browser
+outsource input validation to an untrusted service in such a way that the final
+receiving system can verify correct validation without learning raw inputs?} To
+answer this question, we design and analyze a concrete system called PVE-ZKP
+(Proof-of-Validated-Execution with zero-knowledge proofs) and study its
+applicability as a building block for privacy-preserving input pipelines.
 
-The contributions of this paper are:
+The research contributions of this paper are:
 \begin{enumerate}[leftmargin=*]
-  \item \textbf{Architecture.} We define a browser--validator--receiver
+  \item \textbf{Architecture.} We formalize a browser--validator--receiver
     architecture in which a validation service at port~3001 runs five Circom
     policy circuits over form inputs, generates Groth16 proofs, and stores them
     under opaque identifiers. The browser sends only a proof identifier onward
@@ -79,11 +79,11 @@ The contributions of this paper are:
     circuits that cover format/structure, semantic range, set membership,
     hidden-field integrity via commitments, and path-boundary checks, derived
     from common validation requirements in healthcare-style forms.
-  \item \textbf{Prototype implementation.} We implement PVE-ZKP using Circom
+  \item \textbf{Prototype implementation.} We implement and open-source PVE-ZKP using Circom
     2.1, snarkjs~0.7, circomlib~2.0.5, and Node.js~18, providing build scripts
     for circuit compilation, trusted setup, proof generation, and verification,
     as well as an end-to-end test harness.
-  \item \textbf{Security discussion and limitations.} We analyze the trust and
+  \item \textbf{Security analysis and limitations.} We analyze the trust and
     privacy properties of the architecture, highlight limitations such as
     single-party trusted setup and lack of performance benchmarking
     [VERIFY], and discuss how PVE-ZKP complements circuit-analysis tools such as
