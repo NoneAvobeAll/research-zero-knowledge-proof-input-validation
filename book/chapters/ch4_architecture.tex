@@ -82,6 +82,79 @@ ultimate arbiter of whether a submission is accepted. It:
 By design, the receiving system does not need the raw form data and can make
 its decision based solely on the set of verified proofs.
 
+\section{Protocols and Algorithms}
+
+This section describes the main PVE-ZKP workflows in algorithmic form. The
+algorithms abstract away implementation details while reflecting the behavior
+of the prototype services and client code.
+
+\subsection{Browser Submission Protocol}
+
+\textbf{Protocol 1 (Browser Submission).} The browser client executes the
+following steps when the user submits the form:
+
+\begin{enumerate}[leftmargin=*]
+  \item Collect form fields \texttt{name}, \texttt{dob}, \texttt{role},
+        \texttt{filePath}, and \texttt{token} from the HTML form.
+  \item Construct a JSON object \texttt{formData} containing these fields.
+  \item Send an HTTP \texttt{POST} request to the validation service at
+        \texttt{/validate} on port~3001 with body
+        \texttt{"{"formData": formData}"}.
+  \item If the response indicates validation failure, display an error message
+        to the user and abort.
+  \item If the response indicates success and includes a \texttt{proofId},
+        construct a second JSON object containing only this identifier.
+  \item Send an HTTP \texttt{POST} request to the receiving system at
+        \texttt{/receive} on port~3002 with body
+        \texttt{"{"proofId": proofId}"}.
+  \item Display the receiving system's accept/reject decision to the user.
+\end{enumerate}
+
+\subsection{Validation Service Procedure}
+
+\textbf{Protocol 2 (Validation Service).} On receiving a request at
+\texttt{/validate}, the validation service performs:
+
+\begin{enumerate}[leftmargin=*]
+  \item Parse the JSON body and extract \texttt{formData} fields.
+  \item Perform basic well-formedness checks (e.g., required fields present);
+        reject if checks fail.
+  \item Derive circuit inputs, such as encoding strings as fixed-length ASCII
+        arrays and computing age from date of birth.
+  \item For each of the five policy circuits (format, threshold, membership,
+        integrity, boundary), construct the corresponding input object and call
+        the Groth16 proving routine to obtain a proof and public signals.
+  \item Aggregate the resulting proofs and signals into a single object and
+        store it in an in-memory map keyed by a freshly generated
+        \texttt{proofId}.
+  \item Return a JSON response indicating success and containing \texttt{proofId}.
+\end{enumerate}
+
+\subsection{Receiving System Verification Procedure}
+
+\textbf{Protocol 3 (Receiving System).} On receiving a request at
+\texttt{/receive}, the receiving system operates as follows:
+
+\begin{enumerate}[leftmargin=*]
+  \item Parse the JSON body and extract \texttt{proofId}; reject if it is
+        missing.
+  \item Send an HTTP \texttt{GET} request to the validation service's
+        \texttt{/proof/:id} endpoint to retrieve the stored proofs and public
+        signals associated with \texttt{proofId}.
+  \item For each expected policy circuit, load the corresponding verification
+        key from the local key store.
+  \item For each circuit, invoke the Groth16 verification routine with the
+        verification key, public signals, and proof.
+  \item If any verification fails or any expected proof is missing, return a
+        JSON response indicating that the submission is rejected, along with a
+        reason.
+  \item If all verifications succeed, return a JSON response indicating that
+        the submission is accepted.
+\end{enumerate}
+
+These protocols make explicit how the three components cooperate and where
+cryptographic assumptions enter the design.
+
 \section{Deployment Considerations}
 
 Although the prototype runs both services on localhost, PVE-ZKP is intended to
