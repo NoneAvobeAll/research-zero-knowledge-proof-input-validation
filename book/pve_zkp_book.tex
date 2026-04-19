@@ -1,0 +1,43 @@
+\documentclass[12pt,a4paper]{report}
+
+% PVE-ZKP Pre-Thesis Monograph
+% This "book" is a superset of the conference paper and a precursor to a full thesis.
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{graphicx}
+\usepackage{url}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\usepackage{cite}
+
+\title{PVE-ZKP: Zero-Knowledge Proof-Backed Input Validation for Browser-Based Forms\\[0.5em]\large Pre-Thesis Technical Monograph}
+
+\author{[Author Name] \\[1ex]
+[Institution] \\[0.25ex]
+[Department / Program]}
+
+\date{Draft -- \today}
+
+\begin{document}
+
+\maketitle
+\tableofcontents
+\clearpage
+
+% Each chapter is in a separate file to keep the repo modular.
+
+\include{chapters/ch1_introduction}
+\include{chapters/ch2_background}
+\include{chapters/ch3_problem_model}
+\include{chapters/ch4_architecture}
+\include{chapters/ch5_policy_circuits}
+\include{chapters/ch6_implementation}
+\include{chapters/ch7_security_analysis}
+\include{chapters/ch8_limitations_future_work}
+\include{chapters/ch9_conclusion}
+
+\end{document}
